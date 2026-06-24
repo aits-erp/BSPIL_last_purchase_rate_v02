@@ -5,6 +5,43 @@ app_description = "bsipl Development"
 app_email = "sukeshanee@gmail.com"
 app_license = "mit"
 
+# app_include_js = [
+#     "/assets/bsipl_development/js/purchase_common.js"
+# ]
+
+doctype_js = {
+    "Purchase Order": "public/js/purchase_common.js",
+    "Purchase Invoice": "public/js/purchase_common.js",
+    "Purchase Receipt": "public/js/purchase_common.js"
+}
+
+
+
+fixtures = [
+    {
+        "dt": "Custom Field",
+        "filters": [
+            [
+                "fieldname",
+                "in",
+                [
+                    "custom_last_purchase_date",
+                    "custom_last_purchase_rate"
+                ]
+            ],
+            [
+                "dt",
+                "in",
+                [
+                    "Purchase Order Item",
+                    "Purchase Invoice Item",
+                    "Purchase Receipt Item"
+                ]
+            ]
+        ]
+    }
+]
+
 # Apps
 # ------------------
 
