@@ -9,8 +9,17 @@ app_license = "mit"
 #     "/assets/bsipl_development/js/purchase_common.js"
 # ]
 
+# doctype_js = {
+#     "Purchase Order": "public/js/purchase_common.js",
+#     "Purchase Invoice": "public/js/purchase_common.js",
+#     "Purchase Receipt": "public/js/purchase_common.js"
+# }
+
 doctype_js = {
-    "Purchase Order": "public/js/purchase_common.js",
+    "Purchase Order": [
+        "public/js/purchase_common.js",
+        "public/js/product_code_filter.js"
+    ],
     "Purchase Invoice": "public/js/purchase_common.js",
     "Purchase Receipt": "public/js/purchase_common.js"
 }
@@ -26,7 +35,8 @@ fixtures = [
                 "in",
                 [
                     "custom_last_purchase_date",
-                    "custom_last_purchase_rate"
+                    "custom_last_purchase_rate",
+                    "custom_product_code"
                 ]
             ],
             [
@@ -35,9 +45,16 @@ fixtures = [
                 [
                     "Purchase Order Item",
                     "Purchase Invoice Item",
-                    "Purchase Receipt Item"
+                    "Purchase Receipt Item",
+                    "Item"
                 ]
             ]
+        ]
+    },
+    {
+        "dt": "DocType",
+        "filters": [
+            ["name", "=", "Product Code"]
         ]
     }
 ]
