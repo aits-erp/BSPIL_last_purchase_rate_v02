@@ -25,7 +25,6 @@ doctype_js = {
 }
 
 
-
 fixtures = [
     {
         "dt": "Custom Field",
@@ -50,14 +49,9 @@ fixtures = [
                 ]
             ]
         ]
-    },
-    {
-        "dt": "DocType",
-        "filters": [
-            ["name", "=", "Product Code"]
-        ]
     }
 ]
+
 
 # Apps
 # ------------------
