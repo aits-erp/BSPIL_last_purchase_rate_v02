@@ -1,8 +1,5 @@
-# # Copyright (c) 2026, Sukku and contributors
-# # For license information, please see license.txt
-
-# # import frappe
-
+# # # Copyright (c) 2026, Sukku and contributors
+# # # For license information, please see license.txt
 
 # import frappe
 # from frappe import _
@@ -54,7 +51,7 @@
 #             pri.qty,
 #             'Purchase Receipt' AS voucher_type,
 #             pri.parent AS voucher_no,
-#             '' AS product_code
+#             IFNULL(i.custom_product_code, '') AS product_code
 #         FROM `tabPurchase Receipt Item` pri
 #         INNER JOIN `tabPurchase Receipt` pr ON pr.name = pri.parent
 #         INNER JOIN `tabItem` i ON i.name = pri.item_code
@@ -73,7 +70,7 @@
 #             pii.qty,
 #             'Purchase Invoice' AS voucher_type,
 #             pii.parent AS voucher_no,
-#             '' AS product_code
+#             IFNULL(i.custom_product_code, '') AS product_code
 #         FROM `tabPurchase Invoice Item` pii
 #         INNER JOIN `tabPurchase Invoice` pi ON pi.name = pii.parent
 #         INNER JOIN `tabItem` i ON i.name = pii.item_code
@@ -84,6 +81,10 @@
 #     """.format(c=_cond(filters, "pi", "pii")), filters, as_dict=True)
 
 
+
+
+# Copyright (c) 2026, Sukku and contributors
+# For license information, please see license.txt
 
 import frappe
 from frappe import _
@@ -103,6 +104,7 @@ def get_columns():
         {"label":_("Supplier Name"),"fieldname":"supplier_name","fieldtype":"Data","width":160},
         {"label":_("Supplier Part No"),"fieldname":"supplier_part_no","fieldtype":"Data","width":140},
         {"label":_("Qty"),"fieldname":"qty","fieldtype":"Float","width":90},
+        {"label":_("Balance Qty"),"fieldname":"balance_qty","fieldtype":"Float","width":100},
         {"label":_("Voucher Type"),"fieldname":"voucher_type","fieldtype":"Data","width":160},
         {"label":_("Voucher No"),"fieldname":"voucher_no","fieldtype":"Dynamic Link","options":"voucher_type","width":190},
         {"label":_("Product Code"),"fieldname":"product_code","fieldtype":"Data","width":130},
@@ -114,6 +116,12 @@ def get_data(filters):
         rows += _pr_rows(filters)
     if filters.get("voucher_type") != "Purchase Receipt":
         rows += _pi_rows(filters)
+
+    if rows:
+        balance_map = _get_balance_qty_map(filters)
+        for row in rows:
+            row["balance_qty"] = balance_map.get((row.get("item_code"), row.get("warehouse")), 0)
+
     return rows
 
 def _cond(filters, a, ia):
@@ -163,3 +171,40 @@ def _pi_rows(filters):
         WHERE pi.docstatus = 1 AND pi.is_return = 0 {c}
         ORDER BY pi.posting_date DESC, pii.item_code
     """.format(c=_cond(filters, "pi", "pii")), filters, as_dict=True)
+
+def _get_balance_qty_map(filters):
+    """
+    Returns the current stock balance (qty_after_transaction of the latest
+    Stock Ledger Entry as of `to_date`) per (item_code, warehouse) — exactly
+    how the standard Stock Balance report derives bal_qty.
+    """
+    cond, values = "", {"to_date": filters.get("to_date")}
+
+    if filters.get("company"):
+        cond += " AND company = %(company)s"
+        values["company"] = filters.get("company")
+    if filters.get("item_code"):
+        cond += " AND item_code = %(item_code)s"
+        values["item_code"] = filters.get("item_code")
+    if filters.get("warehouse"):
+        cond += " AND warehouse = %(warehouse)s"
+        values["warehouse"] = filters.get("warehouse")
+
+    rows = frappe.db.sql("""
+        SELECT item_code, warehouse, qty_after_transaction
+        FROM (
+            SELECT
+                item_code, warehouse, qty_after_transaction,
+                ROW_NUMBER() OVER (
+                    PARTITION BY item_code, warehouse
+                    ORDER BY posting_date DESC, posting_time DESC, creation DESC
+                ) AS rn
+            FROM `tabStock Ledger Entry`
+            WHERE docstatus < 2 AND is_cancelled = 0
+                AND posting_date <= %(to_date)s
+                {cond}
+        ) ranked
+        WHERE rn = 1
+    """.format(cond=cond), values, as_dict=True)
+
+    return {(r.item_code, r.warehouse): r.qty_after_transaction for r in rows}
