@@ -15,14 +15,66 @@ app_license = "mit"
 #     "Purchase Receipt": "public/js/purchase_common.js"
 # }
 
+# doctype_js = {
+#     "Purchase Order": [
+#         "public/js/purchase_common.js",
+#         "public/js/product_code_filter.js"
+#     ],
+#     "Purchase Invoice": "public/js/purchase_common.js",
+#     "Purchase Receipt": "public/js/purchase_common.js"
+# }
+
 doctype_js = {
     "Purchase Order": [
         "public/js/purchase_common.js",
         "public/js/product_code_filter.js"
     ],
-    "Purchase Invoice": "public/js/purchase_common.js",
-    "Purchase Receipt": "public/js/purchase_common.js"
+    "Purchase Invoice": [
+        "public/js/purchase_common.js",
+        "public/js/product_code_filter.js"
+    ],
+    "Purchase Receipt": [
+        "public/js/purchase_common.js",
+        "public/js/product_code_filter.js"
+    ],
+    "Quotation": "public/js/product_code_filter.js",
+    "Sales Order": "public/js/product_code_filter.js",
+    "Delivery Note": "public/js/product_code_filter.js",
+    "Sales Invoice": "public/js/product_code_filter.js",
+    "Stock Entry": "public/js/product_code_filter.js",
+    "Material Request": "public/js/product_code_filter.js",
+    "Work Order": "public/js/product_code_filter.js",
+    "BOM": "public/js/product_code_filter.js"
 }
+
+
+# fixtures = [
+#     {
+#         "dt": "Custom Field",
+#         "filters": [
+#             [
+#                 "fieldname",
+#                 "in",
+#                 [
+#                     "custom_last_purchase_date",
+#                     "custom_last_purchase_rate",
+#                     "custom_product_code"
+#                 ]
+#             ],
+#             [
+#                 "dt",
+#                 "in",
+#                 [
+#                     "Purchase Order Item",
+#                     "Purchase Invoice Item",
+#                     "Purchase Receipt Item",
+#                     "Item"
+#                 ]
+#             ]
+#         ]
+#     }
+# ]
+
 
 
 fixtures = [
@@ -42,10 +94,18 @@ fixtures = [
                 "dt",
                 "in",
                 [
+                    "Item",
                     "Purchase Order Item",
                     "Purchase Invoice Item",
                     "Purchase Receipt Item",
-                    "Item"
+                    "Quotation Item",
+                    "Sales Order Item",
+                    "Delivery Note Item",
+                    "Sales Invoice Item",
+                    "Stock Entry Detail",
+                    "Material Request Item",
+                    "Work Order Item",
+                    "BOM Item"
                 ]
             ]
         ]
