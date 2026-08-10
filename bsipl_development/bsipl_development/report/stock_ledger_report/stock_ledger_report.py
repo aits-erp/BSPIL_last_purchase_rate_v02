@@ -1,9 +1,6 @@
 # Copyright (c) 2026, Sukku and contributors
 # For license information, please see license.txt
 
-# import frappe
-
-
 # Copyright (c) 2026, BSIPL and Contributors
 # License: GNU General Public License v3. See license.txt
 
@@ -12,7 +9,6 @@ from frappe import _
 from frappe.utils import cint, flt, get_datetime
 
 from erpnext.stock.doctype.inventory_dimension.inventory_dimension import get_inventory_dimensions
-from erpnext.stock.doctype.serial_no.serial_no import get_serial_nos
 from erpnext.stock.doctype.warehouse.warehouse import apply_warehouse_filter
 from erpnext.stock.utils import (
 	is_reposting_item_valuation_in_progress,
@@ -30,7 +26,7 @@ def execute(filters=None):
 	sl_entries = get_stock_ledger_entries(filters, items)
 	item_details = get_item_details(items, sl_entries, include_uom)
 
-	# Map of Rack No / Part No / Profile Colour sourced from Stock Reconciliation Item
+	# Map of Rack No / Part No / Profile Colour / Product Code sourced from Stock Reconciliation Item
 	sr_item_warehouse_map, sr_item_map = get_stock_reconciliation_details(list(item_details.keys()))
 
 	opening_row = get_opening_balance(filters, columns, sl_entries)
@@ -48,7 +44,6 @@ def execute(filters=None):
 		actual_qty = opening_row.get("qty_after_transaction")
 		stock_value = opening_row.get("stock_value")
 
-	available_serial_nos = {}
 	inventory_dimension_filters_applied = check_inventory_dimension_filters_applied(filters)
 
 	for sle in sl_entries:
@@ -67,17 +62,14 @@ def execute(filters=None):
 
 		sle.update({"in_qty": max(sle.actual_qty, 0), "out_qty": min(sle.actual_qty, 0)})
 
-		if sle.serial_no:
-			update_available_serial_nos(available_serial_nos, sle)
-
 		if sle.actual_qty:
 			sle["in_out_rate"] = flt(sle.stock_value_difference / sle.actual_qty, precision)
 		elif sle.voucher_type == "Stock Reconciliation":
 			sle["in_out_rate"] = sle.valuation_rate
 
-		# Enrich with Rack No / Part No / Profile Colour from Stock Reconciliation Item,
-		# preferring an exact item + warehouse match and falling back to the latest
-		# value recorded for the item across warehouses.
+		# Enrich with Rack No / Part No / Profile Colour / Product Code from Stock
+		# Reconciliation Item, preferring an exact item + warehouse match and
+		# falling back to the latest value recorded for the item across warehouses.
 		sr_detail = sr_item_warehouse_map.get((sle.item_code, sle.warehouse)) or sr_item_map.get(
 			sle.item_code
 		)
@@ -85,6 +77,7 @@ def execute(filters=None):
 			sle["custom_rack"] = sr_detail.get("custom_rack")
 			sle["custom_part_no"] = sr_detail.get("custom_part_no")
 			sle["custom_profile_finish"] = sr_detail.get("custom_profile_finish")
+			sle["custom_product_code"] = sr_detail.get("custom_product_code")
 
 		data.append(sle)
 
@@ -96,8 +89,8 @@ def execute(filters=None):
 
 
 def get_stock_reconciliation_details(items):
-	"""Return the latest Rack No / Part No / Profile Colour for each item,
-	keyed by (item_code, warehouse) and, as a fallback, by item_code alone.
+	"""Return the latest Rack No / Part No / Profile Colour / Product Code for each
+	item, keyed by (item_code, warehouse) and, as a fallback, by item_code alone.
 	Sourced from the (custom) fields on Stock Reconciliation Item.
 	"""
 	if not items:
@@ -116,6 +109,7 @@ def get_stock_reconciliation_details(items):
 			sri.custom_rack,
 			sri.custom_part_no,
 			sri.custom_profile_finish,
+			sri.custom_product_code,
 			sr.posting_date,
 			sr.posting_time,
 			sr.creation,
@@ -140,28 +134,6 @@ def get_stock_reconciliation_details(items):
 	return item_warehouse_map, item_map
 
 
-def update_available_serial_nos(available_serial_nos, sle):
-	from erpnext.stock.doctype.stock_reconciliation.stock_reconciliation import get_stock_balance_for
-
-	serial_nos = get_serial_nos(sle.serial_no)
-	key = (sle.item_code, sle.warehouse)
-	if key not in available_serial_nos:
-		stock_balance = get_stock_balance_for(
-			sle.item_code, sle.warehouse, sle.posting_date, sle.posting_time
-		)
-		serials = get_serial_nos(stock_balance["serial_nos"]) if stock_balance["serial_nos"] else []
-		available_serial_nos.setdefault(key, serials)
-
-	existing_serial_no = available_serial_nos[key]
-	for sn in serial_nos:
-		if sn in existing_serial_no:
-			existing_serial_no.remove(sn)
-		else:
-			existing_serial_no.append(sn)
-
-	sle.balance_serial_no = "\n".join(existing_serial_no)
-
-
 def get_columns(filters):
 	columns = [
 		{"label": _("Date"), "fieldname": "date", "fieldtype": "Datetime", "width": 150},
@@ -173,6 +145,12 @@ def get_columns(filters):
 			"width": 100,
 		},
 		{"label": _("Item Name"), "fieldname": "item_name", "width": 100},
+		{
+			"label": _("Product Code"),
+			"fieldname": "custom_product_code",
+			"fieldtype": "Data",
+			"width": 110,
+		},
 		{
 			"label": _("Stock UOM"),
 			"fieldname": "stock_uom",
@@ -298,13 +276,6 @@ def get_columns(filters):
 				"fieldtype": "Data",
 				"width": 120,
 			},
-			{
-				"label": _("Serial No"),
-				"fieldname": "serial_no",
-				"fieldtype": "Link",
-				"options": "Serial No",
-				"width": 100,
-			},
 		]
 	)
 
@@ -332,7 +303,6 @@ def get_stock_ledger_entries(filters, items):
 			sle.qty_after_transaction,
 			sle.stock_value_difference,
 			sle.stock_value,
-			sle.serial_no,
 		)
 		.where((sle.docstatus < 2) & (sle.is_cancelled == 0) & (sle.posting_datetime[from_date:to_date]))
 		.orderby(sle.posting_datetime)
